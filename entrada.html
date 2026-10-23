@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Registro de entrada del personal</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--tx:#1d1d1b;--mut:#6b6a66;--bd:#dcdad4;--ac:#8a2a1c;--ok:#1f7a45;--no:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--card:#232321;--tx:#f1efea;--mut:#a3a19a;--bd:#3a3935;--ac:#e0705c;--ok:#5fcf8c;--no:#ff8a80;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171716;--card:#232321;--tx:#f1efea;--mut:#a3a19a;--bd:#3a3935;--ac:#e0705c;--ok:#5fcf8c;--no:#ff8a80;color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:auto;padding:14px 14px 40px}
+h1{font-size:20px;margin:6px 0 2px}.sub{color:var(--mut);font-size:13px;margin:0 0 12px}
+h2{font-size:16px;margin:0 0 10px;color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:14px}
+.clock{text-align:center;font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.clock small{display:block;font-size:13px;font-weight:400;color:var(--mut);letter-spacing:0}
+label.f{display:block;font-size:13px;color:var(--mut);margin-bottom:10px}
+input[type=text],input[type=date]{display:block;width:100%;min-width:0;min-height:44px;margin-top:4px;padding:10px;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:9px}
+.g2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+@media (max-width:480px){.g2{grid-template-columns:minmax(0,1fr)}}
+.btn{width:100%;padding:16px;font-weight:700;font-size:17px;font-family:inherit;border:0;border-radius:12px;background:var(--ac);color:#fff;cursor:pointer}
+.btn2{width:100%;padding:12px;margin-top:10px;font-weight:600;font-size:16px;font-family:inherit;border:1.5px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);cursor:pointer}
+#msg{margin:8px 0 0;font-size:14px;min-height:20px}.err{color:var(--no)}.okm{color:var(--ok)}
+.rec{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--bd)}.rec:first-of-type{border-top:0}
+.rec img{width:64px;height:64px;object-fit:cover;border-radius:10px;background:var(--bd);flex:none}
+.rec .i{flex:1;min-width:0}.rec b{display:block;overflow-wrap:anywhere}.rec span{color:var(--mut);font-size:14px}
+.rec .h{font-weight:700;font-variant-numeric:tabular-nums;color:var(--ok);font-size:15px}
+.del{background:none;border:0;color:var(--no);font:inherit;font-size:13px;padding:6px;cursor:pointer}
+.empty{color:var(--mut);text-align:center;padding:14px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Registro de entrada del personal</h1>
+<p class="sub">Foto y hora automática al marcar la entrada</p>
+<div class="card clock"><span id="hh">--:--:--</span><small id="dd"></small></div>
+<div class="card">
+ <h2>Marcar entrada</h2>
+ <div class="g2">
+  <label class="f">Nombre del trabajador<input type="text" id="nom" list="nl" placeholder="Nombre completo" autocomplete="off"></label>
+  <label class="f">Cargo (opcional)<input type="text" id="car" placeholder="Ej: Mesero, Cocina"></label>
+ </div>
+ <datalist id="nl"></datalist>
+ <button class="btn" id="go">📷 Tomar foto y registrar entrada</button>
+ <input type="file" id="cam" accept="image/*" capture="user" hidden>
+ <div id="msg" role="status"></div>
+</div>
+<div class="card">
+ <h2>Entradas registradas</h2>
+ <label class="f">Día<input type="date" id="vd"></label>
+ <div id="list"></div>
+</div>
+<div class="card">
+ <h2>Reporte para el jefe</h2>
+ <label class="f">Administrador que lo envía (tu nombre)<input type="text" id="adm" placeholder="Nombre completo" autocomplete="name"></label>
+ <button class="btn" id="pdf">Generar PDF del día</button>
+ <div id="msg2" role="status" style="margin-top:8px;font-size:14px;min-height:20px"></div>
+</div>
+</main>
+<script>
+(function(){try{
+const KEY="op002-v1";
+let S={admin:"",recs:[]};
+try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+const $=id=>document.getElementById(id);
+const p2=n=>String(n).padStart(2,"0");
+const dk=d=>d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate());
+const hms=d=>p2(d.getHours())+":"+p2(d.getMinutes())+":"+p2(d.getSeconds());
+const fd=s=>{const[a,b,c]=s.split("-");return c+"/"+b+"/"+a};
+const DAYS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+function store(){for(let i=0;i<40;i++){try{localStorage.setItem(KEY,JSON.stringify(S));return true}catch(e){if(S.recs.length<2)return false;S.recs.shift()}}return false}
+const cut=Date.now()-8*864e5;S.recs=S.recs.filter(r=>r.id>=cut);
+function msg(t,c,id){const m=$(id||"msg");m.className=c||"";m.textContent=t}
+function tick(){const d=new Date();$("hh").textContent=hms(d);$("dd").textContent=DAYS[d.getDay()]+" "+fd(dk(d))}
+setInterval(tick,1000);tick();
+$("vd").value=dk(new Date());$("adm").value=S.admin||"";
+$("adm").oninput=()=>{S.admin=$("adm").value;store()};
+$("vd").oninput=render;
+function names(){const u=[...new Set(S.recs.map(r=>r.n))];$("nl").textContent="";u.forEach(n=>{const o=document.createElement("option");o.value=n;$("nl").append(o)})}
+let pend=null,armed=null;
+function render(){names();const L=$("list");L.textContent="";const k=$("vd").value;
+ const rs=S.recs.filter(r=>dk(new Date(r.t))===k).sort((a,b)=>a.id-b.id);
+ if(!rs.length){const e=document.createElement("div");e.className="empty";e.textContent="No hay entradas registradas este día.";L.append(e);return}
+ rs.forEach(r=>{const row=document.createElement("div");row.className="rec";
+  const im=document.createElement("img");im.src=r.img;im.alt=r.n;
+  const i=document.createElement("div");i.className="i";
+  const b=document.createElement("b");b.textContent=r.n;const s=document.createElement("span");s.textContent=r.c||"";
+  const h=document.createElement("div");h.className="h";h.textContent="Entrada "+hms(new Date(r.t));
+  i.append(b,s,h);
+  const d=document.createElement("button");d.className="del";d.textContent="Eliminar";
+  d.onclick=()=>{if(armed!==r.id){armed=r.id;d.textContent="¿Seguro?";setTimeout(()=>{armed=null;d.textContent="Eliminar"},3000);return}
+   S.recs=S.recs.filter(x=>x.id!==r.id);store();armed=null;render()};
+  row.append(im,i,d);L.append(row)})}
+function shrink(f){return new Promise((ok,ko)=>{const u=URL.createObjectURL(f),im=new Image();
+ im.onload=()=>{const s=Math.min(1,480/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+  c.getContext("2d").drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok({img:c.toDataURL("image/jpeg",.7),w:c.width,h:c.height})};
+ im.onerror=()=>ko(new Error("No se pudo leer la foto"));im.src=u})}
+$("go").onclick=()=>{const n=$("nom").value.trim();
+ if(!n){msg("Escribe el nombre del trabajador antes de tomar la foto.","err");$("nom").focus();return}
+ pend={n:n,c:$("car").value.trim()};msg("");$("cam").click()};
+$("cam").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f||!pend)return;const now=new Date(),w=pend;pend=null;
+ try{const s=await shrink(f);S.recs.push({id:now.getTime(),n:w.n,c:w.c,t:now.toISOString(),img:s.img,w:s.w,h:s.h});
+  if(!store()){S.recs.pop();msg("No hay espacio para guardar la foto. Genera el PDF y elimina entradas viejas.","err");return}
+  $("nom").value="";$("car").value="";$("vd").value=dk(now);render();
+  msg("✓ Entrada de "+w.n+" registrada a las "+hms(now),"okm")}
+ catch(er){msg(er.message||"No se pudo registrar la entrada.","err")}};
+async function out(buf,file){
+ const blob=new Blob([buf],{type:"application/pdf"});
+ let dl=null;try{if(typeof claude!=="undefined"&&claude.use)dl=await claude.use("downloads")}catch(e){}
+ if(dl){await dl.save({filename:file,data:buf});return}
+ const f=new File([blob],file,{type:"application/pdf"});
+ if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:file})}catch(e){if(e&&e.name!=="AbortError")throw e}}
+ else{const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=file;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}}
+function build(k,rs){const{jsPDF}=window.jspdf,d=new jsPDF({unit:"mm",format:"letter"}),M=15,W=215.9;let y=16;
+ d.setFont("helvetica","bold");d.setFontSize(15);d.text("REGISTRO DE ENTRADA DEL PERSONAL",M,y);y+=7;
+ d.setFont("helvetica","normal");d.setFontSize(10.5);
+ [["Fecha",fd(k)],["Administrador",S.admin||"—"],["Total de entradas",String(rs.length)]].forEach(([a,b])=>{d.setFont("helvetica","bold");d.text(a+": ",M,y);d.setFont("helvetica","normal");d.text(b,M+d.getTextWidth(a+": ")+1,y);y+=6});
+ y+=3;
+ const head=()=>{d.setFillColor(235,230,225);d.rect(M,y-4.5,W-2*M,7,"F");d.setFont("helvetica","bold");d.setFontSize(10);d.text("Foto",M+2,y);d.text("Nombre",45,y);d.text("Cargo",112,y);d.text("Hora de entrada",158,y);y+=3};
+ head();
+ rs.forEach(r=>{if(y+26>262){d.addPage();y=16;head()}
+  d.setDrawColor(210);d.line(M,y,W-M,y);
+  const sc=Math.min(22/r.w,22/r.h),iw=r.w*sc,ih=r.h*sc;try{d.addImage(r.img,"JPEG",M+2,y+2,iw,ih)}catch(e){}
+  d.setFont("helvetica","bold");d.setFontSize(10.5);d.text(d.splitTextToSize(r.n,64),45,y+8);
+  d.setFont("helvetica","normal");d.text(d.splitTextToSize(r.c||"",42),112,y+8);
+  d.setFont("helvetica","bold");d.text(hms(new Date(r.t)),158,y+8);y+=26});
+ d.line(M,y,W-M,y);
+ const now=new Date(),gen=fd(dk(now))+" "+p2(now.getHours())+":"+p2(now.getMinutes()),np=d.getNumberOfPages();
+ for(let i=1;i<=np;i++){d.setPage(i);d.setFontSize(8);d.setTextColor(110);d.setFont("helvetica","normal");d.text("Elaborado por: "+(S.admin||"—")+" · Generado el "+gen,M,271);d.text("Página "+i+" de "+np,W-M,271,{align:"right"})}
+ return d}
+$("pdf").onclick=async()=>{msg("","","msg2");const k=$("vd").value;
+ if(!S.admin.trim()){msg("Escribe tu nombre en “Administrador que lo envía”.","err","msg2");$("adm").focus();return}
+ const rs=S.recs.filter(r=>dk(new Date(r.t))===k).sort((a,b)=>a.id-b.id);
+ if(!rs.length){msg("No hay entradas ese día para el reporte.","err","msg2");return}
+ try{
+  if(!window.jspdf){msg("Preparando PDF…","","msg2");await new Promise(r=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";s.onload=r;s.onerror=r;document.head.appendChild(s)});
+   if(!window.jspdf){msg("No se pudo cargar el generador de PDF. Revisa tu conexión.","err","msg2");return}}
+  const nm=S.admin.trim().replace(/[^\p{L}\p{N}]+/gu,"_").replace(/^_|_$/g,"");
+  const file="Registro_Entrada_"+k+"_"+nm+".pdf";
+  await out(build(k,rs).output("arraybuffer"),file);
+  msg("PDF listo: "+file,"okm","msg2")}
+ catch(e){if(e&&e.code==="declined"){msg("Descarga cancelada.","","msg2")}else{msg("No se pudo generar el PDF. "+(e&&e.message||""),"err","msg2")}}};
+render();
+}catch(err){const b=document.createElement("div");b.style.cssText="padding:12px;margin:12px;border:1px solid #b3261e;color:#b3261e;border-radius:10px;font:14px system-ui";b.textContent="Error al cargar: "+err.message;document.body.prepend(b)}})();
+</script>
+</body>
+</html>
